@@ -1,7 +1,7 @@
 module ActiveReload
   class MasterDatabase < ActiveRecord::Base
     self.abstract_class = true
-    establish_connection configurations[Rails.env]['master_database'] || configurations['master_database'] || Rails.env
+    establish_connection configurations[Rails.env]['master_database'] || configurations['master_database'] || configurations[Rails.env]
   end
 
   class SlaveDatabase < ActiveRecord::Base
@@ -9,29 +9,29 @@ module ActiveReload
     def self.name
       ActiveRecord::Base.name
     end
-    establish_connection configurations[Rails.env]['slave_database'] || Rails.env
+    establish_connection configurations[Rails.env]['slave_database'] || configurations['slave_database'] || configurations[Rails.env]
   end
 
   class ConnectionProxy
-    
+
     def initialize(master_class, slave_class)
       @master  = master_class
       @slave   = slave_class
       @current = :slave
     end
-    
+
     def master
       @slave.connection_handler.retrieve_connection(@master)
     end
-    
+
     def slave
       @slave.retrieve_connection
     end
-    
+
     def current
       send @current
     end
-    
+
     def self.setup!
       if slave_defined?
         setup_for ActiveReload::MasterDatabase, ActiveReload::SlaveDatabase
@@ -90,12 +90,12 @@ module ActiveReload
   module ActiveRecordConnectionMethods
     def self.included(base)
       base.alias_method_chain :reload, :master
-      
+
       class << base
         def connection_proxy=(proxy)
           @@connection_proxy = proxy
         end
-        
+
         # hijack the original method
         def connection
           @@connection_proxy
