@@ -51,8 +51,9 @@ Considerations
 ### Thinking Sphinx
 
 Thinking Sphinx inspects the `connection` object to determine the database adapter.
-Because masochism works by putting the connection proxy in its place, TS will be confused
-about `ActiveReload::ConnectionProxy` and abort. A possible workaround is to monkeypatch TS right to **hardcode** our adapter after masochism has been enabled:
+Because masochism works by putting the connection proxy in its place, TS will get confused
+about `ActiveReload::ConnectionProxy` and abort. A possible workaround is to monkeypatch
+TS right to **hardcode** our adapter after masochism has been enabled:
 
     # ConnectionProxy from masochism confuses TS
     ThinkingSphinx::Index.class_eval do
@@ -64,6 +65,39 @@ about `ActiveReload::ConnectionProxy` and abort. A possible workaround is to mon
         ThinkingSphinx::MysqlAdapter
       end
     end
+
+In newer versions of Thinking Sphinx (observed in 1.1.3), different parts have to be patched:
+
+    # for ThinkingSphinx v1.1.3
+    ThinkingSphinx::AbstractAdapter.class_eval do
+      def self.detect(model)
+        adapter = model.connection.adapter_name
+        case adapter
+        when 'MySQL'
+          ThinkingSphinx::MysqlAdapter.new(model)
+        when 'PostgreSQL'
+          ThinkingSphinx::PostgreSQLAdapter.new(model)
+        else
+          raise "Invalid database adapter #{adapter.inspect}: Sphinx only supports MySQL and PostgreSQL"
+        end
+      end
+    end
+
+    ThinkingSphinx::Index.class_eval do
+      # we have to overwrite this method because it tries to access
+      # @model.connection.instance_variable_get(:@config)
+      def set_source_database_settings(source)
+        config = @model.configurations[Rails.env].symbolize_keys
+
+        source.sql_host = config[:host]           || "localhost"
+        source.sql_user = config[:username]       || config[:user] || ""
+        source.sql_pass = (config[:password].to_s || "").gsub('#', '\#')
+        source.sql_db   = config[:database]
+        source.sql_port = config[:port]
+        source.sql_sock = config[:socket]
+      end
+    end
+    
 
 ### Litespeed web server or Phusion Passenger (mod\_rails)
 
