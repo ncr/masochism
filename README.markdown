@@ -30,12 +30,12 @@ First, setup your database.yml:
       <<: *defaults
       host: master.example.com
 
-To enable masochism, this is required:
+To enable masochism, this call is required:
 
     # enable masochism
     ActiveReload::ConnectionProxy.setup!
 
-Example usage:
+Example usage for a Rails application:
     
     # in environment.rb
     config.after_initialize do
@@ -119,13 +119,13 @@ the `setup!` call if your connection hasn't been initialized, like:
 Advanced
 --------
 
-The ActiveReload::MasterDatabase model uses a 'master\_database' setting that can either be
-defined for all of your environments, or for each environment as a nested declaration.
+The ActiveReload::MasterDatabase and ActiveReload::SlaveDatabase abstract models use the
+'master\_database' and 'slave\_database' settings, respectively.
 
-The ActiveReload::SlaveDatabase model uses a 'slave\_database' setting that can only be
-defined per environment.
+In 'database.yml' configuration file, both settings can be specified either per-environment or
+global (like in the first example of this document).
 
-Example:
+Examples:
 
     login: &login
       adapter: postgresql
