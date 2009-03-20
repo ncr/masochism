@@ -94,6 +94,14 @@ module ActiveReload
     def method_missing(method, *args, &block)
       current.send(method, *args, &block)
     end
+    
+    def respond_to?(method)
+      super or current.respond_to?(method)
+    end
+    
+    def methods
+      super | current.methods
+    end
   end
 
   module ActiveRecordConnectionMethods
