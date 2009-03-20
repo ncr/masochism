@@ -1,19 +1,27 @@
 module ActiveReload
   class MasterDatabase < ActiveRecord::Base
     self.abstract_class = true
-    establish_connection configurations[Rails.env]['master_database'] || configurations['master_database'] || configurations[Rails.env]
+    
+    if config = configurations[Rails.env]['master_database'] || configurations['master_database']
+      establish_connection config
+    end
   end
 
   class SlaveDatabase < ActiveRecord::Base
     self.abstract_class = true
+    
     def self.name
       ActiveRecord::Base.name
     end
-    establish_connection configurations[Rails.env]['slave_database'] || configurations['slave_database'] || configurations[Rails.env]
+    
+    if config = configurations[Rails.env]['slave_database'] || configurations['slave_database']
+      establish_connection config
+    end
   end
-
+  
+  # replaces the object at ActiveRecord::Base.connection to route read queries
+  # to slave and writes to master database
   class ConnectionProxy
-
     def initialize(master_class, slave_class)
       @master  = master_class
       @slave   = slave_class
@@ -41,7 +49,8 @@ module ActiveReload
     end
 
     def self.slave_defined?
-      ActiveRecord::Base.configurations[Rails.env]['slave_database']
+      configurations = ActiveRecord::Base.configurations
+      configurations[Rails.env]['slave_database'] or configurations['slave_database']
     end
 
     def self.setup_for(master, slave = nil)
