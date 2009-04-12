@@ -11,9 +11,9 @@ module ActiveReload
   # to slave and writes to master database
   class ConnectionProxy
     def initialize(master_class, slave_class)
-      @master  = master_class
-      @slave   = slave_class
-      @current = :slave
+      @master = master_class
+      @slave = slave_class
+      @thread_key = :"#{@slave}_#{self}_type"
     end
 
     def master
@@ -22,10 +22,6 @@ module ActiveReload
 
     def slave
       @slave.retrieve_connection
-    end
-
-    def current
-      send @current
     end
 
     def self.setup!
@@ -65,25 +61,39 @@ module ActiveReload
         klass.establish_connection(connection_spec)
       end
     end
+    
+    # retrieve connection to currently selected database
+    def current
+      send current_type
+    end
+    
+    def current_type
+      Thread.current[@thread_key] ||= :slave
+    end
+    
+    def current_type=(type)
+      Thread.current[@thread_key] = type
+    end
 
-    def with_master(to_slave = true)
-      set_to_master!
+    def with_master
+      old_type = current_type
+      self.current_type = :master
       yield
     ensure
-      set_to_slave! if to_slave
+      self.current_type = old_type
     end
 
     def set_to_master!
-      unless @current == :master
-        @slave.logger.info "Switching to Master"
-        @current = :master
+      unless current_type == :master
+        @slave.logger.info "Switching to master"
+        self.current_type = :master
       end
     end
 
     def set_to_slave!
-      unless @current == :slave
-        @master.logger.info "Switching to Slave"
-        @current = :slave
+      unless current_type == :slave
+        @master.logger.info "Switching to slave"
+        self.current_type = :slave
       end
     end
     
@@ -95,9 +105,9 @@ module ActiveReload
       :remove_timestamps, :rename_column, :rename_table, :reset_sequence!,
       :to => :master
 
-    def transaction(start_db_transaction = true, &block)
-      with_master(start_db_transaction) do
-        master.transaction(start_db_transaction, &block)
+    def transaction(options = {}, &block)
+      with_master do
+        master.transaction(options, &block)
       end
     end
 
