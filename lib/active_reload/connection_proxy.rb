@@ -43,8 +43,13 @@ module ActiveReload
 
     def self.setup_for(master, slave = nil)
       slave ||= ActiveRecord::Base
-      slave.__send__(:include, ActiveRecordConnectionMethods)
-      ActiveRecord::Observer.__send__(:include, ActiveReload::ObserverExtensions)
+      
+      unless slave.respond_to?(:connection_proxy=)
+        slave.__send__(:include, ActiveRecordConnectionMethods)
+      end
+      unless ActiveRecord::Observer.instance_methods.include?('update_with_master')
+        ActiveRecord::Observer.__send__(:include, ActiveReload::ObserverExtensions)
+      end
       
       # wire up MasterDatabase and SlaveDatabase
       establish_connections
@@ -149,22 +154,20 @@ module ActiveReload
     end
   end
 
-  # extend observer to always use the master database
-  # observers only get triggered on writes, so shouldn't be a performance hit
-  # removes a race condition if you are using conditionals in the observer
+  # make observers always use the master database
   module ObserverExtensions
     def self.included(base)
-      base.alias_method_chain :update, :masterdb
+      base.alias_method_chain :update, :master
     end
 
     # Send observed_method(object) if the method exists.
-    def update_with_masterdb(observed_method, object) #:nodoc:
+    def update_with_master(observed_method, object)
       if object.respond_to?(:connection) && object.connection.respond_to?(:with_master)
-        object.class.connection.with_master do
-          update_without_masterdb(observed_method, object)
+        object.connection.with_master do
+          update_without_master(observed_method, object)
         end
       else
-        update_without_masterdb(observed_method, object)
+        update_without_master(observed_method, object)
       end
     end
   end

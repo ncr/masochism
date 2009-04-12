@@ -1,4 +1,5 @@
 require 'test/unit'
+require 'mocha'
 require 'active_support'
 require 'active_support/test_case'
 require 'active_record'
@@ -13,7 +14,6 @@ end
 class MasochismTestCase < ActiveSupport::TestCase
   setup do
     ActiveRecord::Base.configurations = default_configuration
-    ActiveRecord::Base.establish_connection
   end
   
   def self.default_configuration
@@ -24,16 +24,20 @@ class MasochismTestCase < ActiveSupport::TestCase
     ActiveRecord::Base.configurations
   end
   
+  def connection
+    ActiveRecord::Base.connection
+  end
+  
   def enable_masochism
     ActiveReload::ConnectionProxy.setup!
   end
   
   def master
-    ActiveRecord::Base.connection.master
+    connection.master
   end
   
   def slave
-    ActiveRecord::Base.connection.slave
+    connection.slave
   end
 end
 
@@ -90,5 +94,56 @@ class ConnectionProxyTest < MasochismTestCase
     create_table
 
     assert_equal [], slave.tables, 'Master and Slave should be different databases'
+  end
+end
+
+class DelegatingTest < MasochismTestCase
+  setup :place_mocks
+  
+  def place_mocks
+    # this doesn't actually establish any connections,
+    # but we don't need them
+    enable_masochism
+    @master = mock
+    @slave = mock
+    connection.stubs(:master).returns(@master)
+    connection.stubs(:slave).returns(@slave)
+  end
+  
+  def test_connection_is_a_proxy
+    assert_equal 'ActiveReload::ConnectionProxy', connection.class.name
+  end
+  
+  def test_reads_go_to_slave
+    @slave.expects(:select_rows).with('SELECT').returns(['bar'])
+    assert_equal ['bar'], connection.select_rows('SELECT')
+  end
+  
+  def test_writes_go_to_master
+    @master.expects(:insert).with('INSERT').returns(1)
+    assert_equal 1, connection.insert('INSERT')
+  end
+  
+  def test_execute_gos_to_master
+    @master.expects(:execute).with('QUERY').returns('result')
+    assert_equal 'result', connection.execute('QUERY')
+  end
+  
+  def test_with_master
+    @master.expects(:select_rows).returns(['foo'])
+    @slave.expects(:select_rows).returns(['bar'])
+    
+    connection.with_master do
+      assert_equal ['foo'], connection.select_rows
+    end
+    assert_equal ['bar'], connection.select_rows
+  end
+  
+  def test_transactions_run_on_master
+    @master.expects(:transaction).with({:foo => 'bar'})
+    
+    ActiveRecord::Base.transaction(:foo => 'bar') do
+      # hardcore transaction stuff
+    end
   end
 end
