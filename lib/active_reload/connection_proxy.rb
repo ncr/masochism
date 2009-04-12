@@ -29,7 +29,7 @@ module ActiveReload
     end
 
     def master
-      @slave.connection_handler.retrieve_connection(@master)
+      @master.retrieve_connection
     end
 
     def slave
