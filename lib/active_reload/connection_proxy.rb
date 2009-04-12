@@ -80,10 +80,14 @@ module ActiveReload
         @current = :slave
       end
     end
-
-    delegate :insert, :update, :delete, :create_table, :rename_table, :drop_table, :add_column, :remove_column,
-      :change_column, :change_column_default, :rename_column, :add_index, :remove_index, :initialize_schema_information,
-      :dump_schema_information, :execute, :columns, :to => :master
+    
+    delegate :execute, :insert, :update, :delete,
+      :add_column, :add_index, :add_timestamps, :assume_migrated_upto_version, :change_column,
+      :change_column_default, :change_column_null, :change_table, :create_database, :create_table,
+      :disable_referential_integrity, :drop_database, :drop_table, :initialize_schema_migrations_table,
+      :insert_fixture, :recreate_database, :remove_column, :remove_columns, :remove_index,
+      :remove_timestamps, :rename_column, :rename_table, :reset_sequence!,
+      :to => :master
 
     def transaction(start_db_transaction = true, &block)
       with_master(start_db_transaction) do
