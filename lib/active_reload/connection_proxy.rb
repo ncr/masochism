@@ -144,13 +144,11 @@ module ActiveReload
         end
       end
     end
-
-    def reload_with_master(*args, &block)
-      if connection.class.name == "ActiveReload::ConnectionProxy"
-        connection.with_master { reload_without_master }
-      else
-        reload_without_master
-      end
+    
+    # reload performs a find, but is usually used after a write, so we lock it
+    # to master since we can't depend on slave replication being so fast
+    def reload_with_master(options = nil)
+      connection.with_master { reload_without_master(options) }
     end
   end
 
