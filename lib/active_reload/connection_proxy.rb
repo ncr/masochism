@@ -1,22 +1,10 @@
 module ActiveReload
   class MasterDatabase < ActiveRecord::Base
     self.abstract_class = true
-    
-    if config = configurations[Rails.env]['master_database'] || configurations['master_database']
-      establish_connection config
-    end
   end
 
   class SlaveDatabase < ActiveRecord::Base
     self.abstract_class = true
-    
-    def self.name
-      ActiveRecord::Base.name
-    end
-    
-    if config = configurations[Rails.env]['slave_database'] || configurations['slave_database']
-      establish_connection config
-    end
   end
   
   # replaces the object at ActiveRecord::Base.connection to route read queries
@@ -49,15 +37,33 @@ module ActiveReload
     end
 
     def self.slave_defined?
-      configurations = ActiveRecord::Base.configurations
-      configurations[Rails.env]['slave_database'] or configurations['slave_database']
+      !!configuration_for(:slave)
+    end
+    
+    def self.configuration_for(type)
+      config, key = ActiveRecord::Base.configurations, "#{type}_database"
+      config[Rails.env][key] || config[key]
     end
 
     def self.setup_for(master, slave = nil)
       slave ||= ActiveRecord::Base
-      slave.send :include, ActiveRecordConnectionMethods
-      ActiveRecord::Observer.send :include, ActiveReload::ObserverExtensions
+      slave.__send__(:include, ActiveRecordConnectionMethods)
+      ActiveRecord::Observer.__send__(:include, ActiveReload::ObserverExtensions)
+      
+      # wire up MasterDatabase and SlaveDatabase
+      establish_connections
       slave.connection_proxy = new(master, slave)
+    end
+    
+    def self.establish_connections
+      [:master, :slave].each { |type| establish_connection_for(type) }
+    end
+    
+    def self.establish_connection_for(type)
+      if connection_spec = configuration_for(type)
+        klass = ActiveReload::const_get("#{type}_database".camelize)
+        klass.establish_connection(connection_spec)
+      end
     end
 
     def with_master(to_slave = true)
