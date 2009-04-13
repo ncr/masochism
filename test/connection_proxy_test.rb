@@ -114,6 +114,10 @@ class DelegatingTest < MasochismTestCase
     assert_equal 'ActiveReload::ConnectionProxy', connection.class.name
   end
   
+  def test_masochistic
+    assert connection.masochistic?
+  end
+  
   def test_reads_go_to_slave
     @slave.expects(:select_rows).with('SELECT').returns(['bar'])
     assert_equal ['bar'], connection.select_rows('SELECT')

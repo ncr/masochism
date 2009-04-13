@@ -127,6 +127,10 @@ module ActiveReload
     def methods
       super | current.methods
     end
+    
+    def masochistic?
+      true
+    end
   end
 
   module ActiveRecordConnectionMethods
@@ -160,7 +164,7 @@ module ActiveReload
 
     # Send observed_method(object) if the method exists.
     def update_with_master(observed_method, object)
-      if object.respond_to?(:connection) && object.connection.respond_to?(:with_master)
+      if object.respond_to?(:connection) && object.connection.masochistic?
         object.connection.with_master do
           update_without_master(observed_method, object)
         end
@@ -168,5 +172,11 @@ module ActiveReload
         update_without_master(observed_method, object)
       end
     end
+  end
+end
+
+ActiveRecord::ConnectionAdapters::AbstractAdapter.class_eval do
+  def masochistic?
+    false
   end
 end
