@@ -140,10 +140,14 @@ class DelegatingTest < MasochismTestCase
   end
   
   def test_transactions_run_on_master
-    @master.expects(:transaction).with({:foo => 'bar'})
+    @master.expects(:transaction).with(:foo => 'bar').yields
+    
+    assert_equal :slave, connection.current_type
     
     ActiveRecord::Base.transaction(:foo => 'bar') do
       # hardcore transaction stuff
+      assert_equal :master, connection.current_type
     end
+    assert_equal :slave, connection.current_type
   end
 end
