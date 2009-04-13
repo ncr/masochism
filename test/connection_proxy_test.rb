@@ -4,6 +4,7 @@ require 'active_support'
 require 'active_support/test_case'
 require 'active_record'
 require 'active_reload/connection_proxy'
+require 'active_reload/master_filter'
 
 RAILS_ENV = 'test'
 
@@ -153,5 +154,59 @@ class DelegatingTest < MasochismTestCase
       assert_equal :master, connection.current_type
     end
     assert_equal :slave, connection.current_type
+  end
+end
+
+class MasterFilterTest < MasochismTestCase
+  setup :prepare
+  
+  def prepare
+    enable_masochism
+    @controller = mock
+  end
+  
+  def test_yields_in_master_block
+    yielded = false
+    ActiveReload::MasterFilter.filter(@controller) do
+      assert_equal :master, connection.current_type
+      yielded = true
+    end
+    assert yielded
+  end
+  
+  def test_doesnt_yield_in_master_without_masochism
+    connection.expects(:masochistic?).returns(false)
+    
+    yielded = false
+    ActiveReload::MasterFilter.filter(@controller) do
+      assert_equal :slave, connection.current_type
+      yielded = true
+    end
+    assert yielded
+  end
+  
+  def test_instance_mode
+    model = mock
+    model.stubs(:connection).returns(connection)
+    
+    yielded = false
+    ActiveReload::MasterFilter.new(model).filter(@controller) do
+      assert_equal :master, connection.current_type
+      yielded = true
+    end
+    assert yielded
+  end
+  
+  def test_instance_mode_without_masochism
+    model = mock
+    conn = mock
+    model.stubs(:connection).returns(conn)
+    conn.expects(:masochistic?).returns(false)
+    
+    yielded = false
+    ActiveReload::MasterFilter.new(model).filter(@controller) do
+      yielded = true
+    end
+    assert yielded
   end
 end

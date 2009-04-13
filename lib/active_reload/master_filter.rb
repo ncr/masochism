@@ -1,12 +1,32 @@
 module ActiveReload
-  # MasterFilter should be used as an around filter in your controllers that require certain actions to use the Master DB for reads as well as writes
+  # MasterFilter is an around filter for controllers that require certain actions
+  # to use the master database for both reads and writes
+  #
+  # Usage:
+  #   # class level:
+  #   around_filter ActiveReload::MasterFilter
+  #   
+  #   # instance level:
+  #   around_filter ActiveReload::MasterFilter.new(MyModel)
   class MasterFilter
     def self.filter(controller, &block)
-      if ActiveRecord::Base.connection.respond_to?(:with_master)
-        ActiveRecord::Base.connection.with_master(&block)
+      with_master(&block)
+    end
+    
+    def self.with_master(klass = ActiveRecord::Base)
+      if klass.connection.masochistic?
+        klass.connection.with_master { yield }
       else
-        yield block
+        yield
       end
+    end
+    
+    def initialize(klass)
+      @klass = klass
+    end
+    
+    def filter(controller, &block)
+      self.class.with_master(@klass, &block)
     end
   end
 end
