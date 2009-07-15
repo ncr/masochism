@@ -25,17 +25,9 @@ module ActiveReload
     end
 
     def self.setup!
-      if slave_defined?
-        setup_for ActiveReload::MasterDatabase, ActiveReload::SlaveDatabase
-      else
-        setup_for ActiveReload::MasterDatabase
-      end
+      setup_for ActiveReload::MasterDatabase
     end
 
-    def self.slave_defined?
-      !!configuration_for(:slave)
-    end
-    
     def self.configuration_for(type)
       config, key = ActiveRecord::Base.configurations, "#{type}_database"
       config[Rails.env][key] || config[key]

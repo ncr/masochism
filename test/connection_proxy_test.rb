@@ -57,15 +57,6 @@ class ConnectionProxyTest < MasochismTestCase
     master.create_table(:foo) {|t|}
   end
   
-  def test_slave_defined_returns_false_when_slave_not_defined
-    assert !ActiveReload::ConnectionProxy.slave_defined?, 'Slave should not be defined'
-  end
-
-  def test_slave_defined_returns_true_when_slave_defined
-    config.update('slave_database' => {})
-    assert ActiveReload::ConnectionProxy.slave_defined?, 'Slave should be defined'
-  end
-
   def test_default
     enable_masochism
     create_table
